@@ -29,7 +29,7 @@ private:
         unique_ptr<NameNode> left;
         unique_ptr<NameNode> right;
 
-        explicit NameNode(NameKey value) : key(move(value)) {}
+        explicit NameNode(NameKey value) : key(std::move(value)) {}
     };
 
     static constexpr size_t RECENT_LIMIT = 5;
@@ -49,11 +49,11 @@ private:
 
     static void insertName(unique_ptr<NameNode>& node, NameKey key) {
         if (!node) {
-            node = make_unique<NameNode>(move(key));
+            node = make_unique<NameNode>(std::move(key));
         } else if (keyLess(key, node->key)) {
-            insertName(node->left, move(key));
+            insertName(node->left, std::move(key));
         } else {
-            insertName(node->right, move(key));
+            insertName(node->right, std::move(key));
         }
     }
 
@@ -62,7 +62,7 @@ private:
             return takeMinimum(node->left);
         }
         NameKey minimum = node->key;
-        node = move(node->right);
+        node = std::move(node->right);
         return minimum;
     }
 
@@ -75,9 +75,9 @@ private:
         } else if (keyLess(node->key, key)) {
             eraseName(node->right, key);
         } else if (!node->left) {
-            node = move(node->right);
+            node = std::move(node->right);
         } else if (!node->right) {
-            node = move(node->left);
+            node = std::move(node->left);
         } else {
             node->key = takeMinimum(node->right);
         }
