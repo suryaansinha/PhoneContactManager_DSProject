@@ -80,9 +80,18 @@ private:
         insertName(namesRoot_, NameKey{contact.name, contact.id});
     }
 
+    static string normalizeName(string name) {
+        transform(name.begin(), name.end(), name.begin(), [](unsigned char character) {
+            return static_cast<char>(tolower(character));
+        });
+        return name;
+    }
+
     static bool keyLess(const NameKey& a, const NameKey& b) {
-        if (a.name != b.name) {
-            return a.name < b.name;
+        const string normalizedA = normalizeName(a.name);
+        const string normalizedB = normalizeName(b.name);
+        if (normalizedA != normalizedB) {
+            return normalizedA < normalizedB;
         }
         return a.id < b.id;
     }
@@ -140,16 +149,17 @@ private:
         if (!node) {
             return;
         }
-        if (node->key.name >= name) {
+        const string nodeName = normalizeName(node->key.name);
+        if (nodeName >= name) {
             collectByName(node->left.get(), name, result);
         }
-        if (node->key.name == name) {
+        if (nodeName == name) {
             auto found = contactsById_.find(node->key.id);
             if (found != contactsById_.end()) {
                 result.push_back(found->second);
             }
         }
-        if (node->key.name <= name) {
+        if (nodeName <= name) {
             collectByName(node->right.get(), name, result);
         }
     }
@@ -207,17 +217,15 @@ public:
         return true;
     }
 
-    bool deleteContact(const string& phone) {
-        auto phoneEntry = idByPhone_.find(phone);
-        if (phoneEntry == idByPhone_.end()) {
+    bool deleteContactById(int id) {
+        auto contactEntry = contactsById_.find(id);
+        if (contactEntry == contactsById_.end()) {
             return false;
         }
-        const int id = phoneEntry->second;
-        const Contact& contact = contactsById_.at(id);
-        const Contact deletedContact = contact;
-        eraseName(namesRoot_, NameKey{contact.name, contact.id});
-        idByPhone_.erase(phoneEntry);
-        contactsById_.erase(id);
+        const Contact deletedContact = contactEntry->second;
+        eraseName(namesRoot_, NameKey{deletedContact.name, deletedContact.id});
+        idByPhone_.erase(deletedContact.phone);
+        contactsById_.erase(contactEntry);
         undoStack_.push({ActionType::DELETE, deletedContact, Contact{}});
         return true;
     }
@@ -250,7 +258,7 @@ public:
 
     vector<Contact> findByName(const string& name) const {
         vector<Contact> result;
-        collectByName(namesRoot_.get(), name, result);
+        collectByName(namesRoot_.get(), normalizeName(name), result);
         return result;
     }
 
@@ -315,7 +323,7 @@ int main() {
                   << "3. Search by phone\n"
                   << "4. Search by exact name\n"
                   << "5. Update contact\n"
-                  << "6. Delete contact\n"
+                  << "6. Delete contact by name\n"
                   << "7. View recently added\n"
                   << "8. Undo last action\n"
                   << "0. Exit\n";
@@ -364,10 +372,30 @@ int main() {
                 cout << "That new phone number is already in use.\n";
             }
         } else if (choice == "6") {
-            if (manager.deleteContact(readLine("Phone number to delete: "))) {
-                cout << "Contact deleted.\n";
-            } else {
+            const vector<Contact> matches = manager.findByName(readLine("Name to delete: "));
+            if (matches.empty()) {
                 cout << "No matching contact found.\n";
+            } else if (matches.size() == 1) {
+                showMatches(matches);
+                if (manager.deleteContactById(matches.front().id)) {
+                    cout << "Contact deleted.\n";
+                }
+            } else {
+                cout << "Several contacts have that name. Choose the ID to delete:\n";
+                showMatches(matches);
+                const string selectedId = readLine("Contact ID (0 to cancel): ");
+                if (selectedId == "0") {
+                    cout << "Delete cancelled.\n";
+                } else {
+                    auto selected = find_if(matches.begin(), matches.end(), [&](const Contact& contact) {
+                        return to_string(contact.id) == selectedId;
+                    });
+                    if (selected != matches.end() && manager.deleteContactById(selected->id)) {
+                        cout << "Contact deleted.\n";
+                    } else {
+                        cout << "Invalid contact ID.\n";
+                    }
+                }
             }
         } else if (choice == "7") {
             manager.displayRecent();
