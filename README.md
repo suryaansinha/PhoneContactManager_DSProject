@@ -6,8 +6,9 @@ A basic menu-driven phone contact manager written in C++17. Contacts are kept in
 
 - Add contacts with a name, unique phone number, and optional email
 - Display all contacts alphabetically by name
-- Search by phone number or exact name
-- Update or delete a contact by phone number
+- Search by phone number or case-insensitive name
+- Update a contact by phone number
+- Delete a contact by name; choose a contact ID if names are duplicated
 - Display the five most recently added contacts
 - Undo the most recent add, update, or delete
 
@@ -29,3 +30,10 @@ g++ -std=c++17 -Wall -Wextra -pedantic main.cpp -o contact_manager
 ```
 
 Undo is available for changes made during the current run. Contacts and undo history are not saved after the program exits. File persistence can be added as a later enhancement.
+
+## Sample scenarios
+
+1. **Case-insensitive search:** Add a contact named `Alex Kim`, then search for `alex kim` or `ALEX KIM`. The contact is found either way.
+2. **Delete by name:** Choose **Delete contact by name** and enter `alex kim`. The matching contact is shown and deleted. If several contacts have that name, select the ID of the one to delete, or enter `0` to cancel.
+3. **Undo a deletion:** Delete a contact, choose **Undo last action**, then view all contacts. The deleted contact is restored.
+4. **Undo an update:** Change a contact's name or phone number, then choose **Undo last action**. Its previous details are restored.
