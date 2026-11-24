@@ -3,6 +3,7 @@
 #include <iostream>
 #include <memory>
 #include <queue>
+#include <stack>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -32,6 +33,14 @@ private:
         explicit NameNode(NameKey value) : key(std::move(value)) {}
     };
 
+    enum class ActionType { ADD, DELETE, UPDATE };
+
+    struct UndoAction {
+        ActionType type;
+        Contact before;
+        Contact after;
+    };
+
     static constexpr size_t RECENT_LIMIT = 5;
 
     int nextId_ = 1;
@@ -39,6 +48,37 @@ private:
     unordered_map<string, int> idByPhone_;
     unique_ptr<NameNode> namesRoot_;
     queue<int> recentlyAdded_;
+    stack<UndoAction> undoStack_;
+
+    void eraseContactById(int id) {
+        auto found = contactsById_.find(id);
+        if (found == contactsById_.end()) {
+            return;
+        }
+        const Contact contact = found->second;
+        eraseName(namesRoot_, NameKey{contact.name, contact.id});
+        idByPhone_.erase(contact.phone);
+        contactsById_.erase(found);
+    }
+
+    void restoreContact(const Contact& contact) {
+        contactsById_[contact.id] = contact;
+        idByPhone_[contact.phone] = contact.id;
+        insertName(namesRoot_, NameKey{contact.name, contact.id});
+    }
+
+    void replaceContact(const Contact& contact) {
+        auto found = contactsById_.find(contact.id);
+        if (found == contactsById_.end()) {
+            return;
+        }
+        const Contact oldContact = found->second;
+        eraseName(namesRoot_, NameKey{oldContact.name, oldContact.id});
+        idByPhone_.erase(oldContact.phone);
+        found->second = contact;
+        idByPhone_[contact.phone] = contact.id;
+        insertName(namesRoot_, NameKey{contact.name, contact.id});
+    }
 
     static bool keyLess(const NameKey& a, const NameKey& b) {
         if (a.name != b.name) {
@@ -138,6 +178,7 @@ public:
         if (recentlyAdded_.size() > RECENT_LIMIT) {
             recentlyAdded_.pop();
         }
+        undoStack_.push({ActionType::ADD, Contact{}, contact});
         return true;
     }
 
@@ -152,6 +193,7 @@ public:
         }
 
         Contact& contact = contactsById_.at(phoneEntry->second);
+        const Contact previous = contact;
         eraseName(namesRoot_, NameKey{contact.name, contact.id});
         if (newPhone != currentPhone) {
             idByPhone_.erase(phoneEntry);
@@ -161,6 +203,7 @@ public:
         contact.phone = newPhone;
         contact.email = newEmail;
         insertName(namesRoot_, NameKey{contact.name, contact.id});
+        undoStack_.push({ActionType::UPDATE, previous, contact});
         return true;
     }
 
@@ -171,9 +214,28 @@ public:
         }
         const int id = phoneEntry->second;
         const Contact& contact = contactsById_.at(id);
+        const Contact deletedContact = contact;
         eraseName(namesRoot_, NameKey{contact.name, contact.id});
         idByPhone_.erase(phoneEntry);
         contactsById_.erase(id);
+        undoStack_.push({ActionType::DELETE, deletedContact, Contact{}});
+        return true;
+    }
+
+    bool undoLastAction() {
+        if (undoStack_.empty()) {
+            return false;
+        }
+
+        const UndoAction action = undoStack_.top();
+        undoStack_.pop();
+        if (action.type == ActionType::ADD) {
+            eraseContactById(action.after.id);
+        } else if (action.type == ActionType::DELETE) {
+            restoreContact(action.before);
+        } else {
+            replaceContact(action.before);
+        }
         return true;
     }
 
@@ -255,6 +317,7 @@ int main() {
                   << "5. Update contact\n"
                   << "6. Delete contact\n"
                   << "7. View recently added\n"
+                  << "8. Undo last action\n"
                   << "0. Exit\n";
         const string choice = readLine("Choose an option: ");
 
@@ -308,6 +371,12 @@ int main() {
             }
         } else if (choice == "7") {
             manager.displayRecent();
+        } else if (choice == "8") {
+            if (manager.undoLastAction()) {
+                cout << "Last action undone.\n";
+            } else {
+                cout << "There is no action to undo.\n";
+            }
         } else {
             cout << "Please choose a listed option.\n";
         }
