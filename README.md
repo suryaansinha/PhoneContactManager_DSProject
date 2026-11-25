@@ -1,39 +1,43 @@
 # Phone Contact Manager
 
-A basic menu-driven phone contact manager written in C++17. Contacts are kept in memory while the program runs.
+A basic menu-driven phone contact manager written entirely in C. Contacts are saved in a text file so they remain available after the program exits.
 
 ## Features
 
 - Add contacts with a name, unique phone number, and optional email
-- Display all contacts alphabetically by name
-- Search by phone number or case-insensitive name
-- Update a contact by phone number
-- Delete a contact by name; choose a contact ID if names are duplicated
-- Display the five most recently added contacts
-- Undo the most recent add, update, or delete
+- Display contacts alphabetically by name
+- Search by phone number or case-insensitive exact name
+- Update contacts by phone number
+- Delete contacts by name; choose a contact ID when names are duplicated
+- View the five most recently added contacts during the current session
+- Undo the most recent add, update, or delete during the current session
+- Automatically load contacts at startup and save after changes and on exit
 
 ## Data structures
 
-- `unordered_map<int, Contact>` stores the contact records by stable ID.
-- `unordered_map<string, int>` indexes unique phone numbers for average O(1) lookup.
-- A binary search tree stores `(name, ID)` keys for alphabetical display and exact-name search. The ID allows contacts with the same name.
-- `queue<int>` keeps the five most recently added contact IDs. Deleted contacts are skipped when showing this list.
-- `stack<UndoAction>` stores the previous state for add, update, and delete operations. Undo processes the newest change first (LIFO).
+- A linked list stores the contact records.
+- A hash table with separate chaining indexes phone numbers for fast lookup.
+- A binary search tree indexes contacts by case-insensitive name and ID for alphabetical display and name search.
+- A queue stores up to five recently added contact IDs.
+- A stack stores the previous state for add, update, and delete operations so the last change can be undone first (LIFO).
 
-The BST is implemented with `unique_ptr` nodes so its memory is released automatically. Its operations are O(log n) on average and O(n) in the worst case because this basic implementation is not self-balancing.
+These structures are implemented directly with C structs, pointers, and functions. The binary search tree is not self-balancing, so its operations take O(log n) time on average and O(n) in the worst case.
 
 ## Build and run
 
 ```sh
-g++ -std=c++17 -Wall -Wextra -pedantic main.cpp -o contact_manager
+cc -std=c11 -Wall -Wextra -pedantic main.c -o contact_manager
 ./contact_manager
 ```
 
-Undo is available for changes made during the current run. Contacts and undo history are not saved after the program exits. File persistence can be added as a later enhancement.
+The program reads and writes `contacts.txt` in its current working directory. Each record is stored as a tab-separated row containing the contact ID, name, phone number, and email. Tabs are not accepted in entered fields because they are used as file separators. If a row in the file is malformed or has a duplicate ID or phone number, that row is skipped when loading.
+
+Contact records persist between runs. The undo history and recent-contacts queue are session-only and start empty each time the program launches.
 
 ## Sample scenarios
 
-1. **Case-insensitive search:** Add a contact named `Alex Kim`, then search for `alex kim` or `ALEX KIM`. The contact is found either way.
-2. **Delete by name:** Choose **Delete contact by name** and enter `alex kim`. The matching contact is shown and deleted. If several contacts have that name, select the ID of the one to delete, or enter `0` to cancel.
-3. **Undo a deletion:** Delete a contact, choose **Undo last action**, then view all contacts. The deleted contact is restored.
-4. **Undo an update:** Change a contact's name or phone number, then choose **Undo last action**. Its previous details are restored.
+1. **Persistence:** Add `Alex Kim` with phone `555-0101`, exit, then run the program again. The contact loads from `contacts.txt`.
+2. **Case-insensitive search:** Search for `alex kim` or `ALEX KIM`; both find `Alex Kim`.
+3. **Delete by name:** Choose **Delete contact by name** and enter `alex kim`. If multiple contacts match, choose the ID of the contact to delete, or enter `0` to cancel.
+4. **Undo a deletion:** Delete a contact, choose **Undo last action**, then view all contacts. The contact is restored and the file is updated.
+5. **Undo an update:** Change a contact's name or phone number, then choose **Undo last action**. Its previous details are restored and saved.
