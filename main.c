@@ -190,26 +190,6 @@ static int pushUndo(ContactManager *manager, ActionType type,
     return 1;
 }
 
-static int enqueueRecent(ContactManager *manager, int id) {
-    QueueNode *node = (QueueNode *)malloc(sizeof(QueueNode));
-    if (!node) return 0;
-    node->id = id;
-    node->next = NULL;
-    if (manager->recent_tail) manager->recent_tail->next = node;
-    else manager->recent_head = node;
-    manager->recent_tail = node;
-    ++manager->recent_count;
-
-    if (manager->recent_count > RECENT_LIMIT) {
-        QueueNode *oldest = manager->recent_head;
-        manager->recent_head = oldest->next;
-        if (!manager->recent_head) manager->recent_tail = NULL;
-        free(oldest);
-        --manager->recent_count;
-    }
-    return 1;
-}
-
 /* Inserts one contact and builds all indexes. Used by add and file loading. */
 static int storeContact(ContactManager *manager, const Contact *contact,
                         int track_recent, int record_undo) {
@@ -459,7 +439,7 @@ static int parseContactLine(char *line, Contact *contact) {
 
     errno = 0;
     id = strtol(line, &end, 10);
-    if (errno || end == line || *end || id <= 0 || id >= 2147483647L) return 0;
+    if (errno || end == line || *end || id <= 0 || id >= INT_MAX) return 0;
     if (strlen(first) == 0 || strlen(first) >= NAME_SIZE ||
         strlen(second) == 0 || strlen(second) >= PHONE_SIZE ||
         strlen(third) >= EMAIL_SIZE) return 0;
@@ -532,7 +512,7 @@ static int parsePositiveInt(const char *text, int *value) {
     long parsed;
     errno = 0;
     parsed = strtol(text, &end, 10);
-    if (errno || end == text || *end || parsed < 0 || parsed > 2147483647L) return 0;
+    if (errno || end == text || *end || parsed < 0 || parsed > INT_MAX) return 0;
     *value = (int)parsed;
     return 1;
 }
